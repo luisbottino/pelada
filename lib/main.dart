@@ -1,41 +1,27 @@
 import 'package:flutter/material.dart';
+import 'features/home/presentation/screens/home_screen.dart';
+import 'features/match/presentation/screens/new_match_screen.dart';
 
 void main() {
-  runApp(const PeladaApp());
+  runApp(const MyApp());
 }
 
-class PeladaApp extends StatelessWidget {
-  const PeladaApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Pelada',
+      title: 'Pelada de Vôlei',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
-        useMaterial3: true
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        useMaterial3: true,
       ),
-      debugShowCheckedModeBanner: false,
-      home: const HomeScreen(),
-    );
-  }
-}
-
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Pelada de Vôlei'),
-      ),
-      body: Center(
-        child: ElevatedButton(onPressed: () {
-
-        }, child: const Text('Começar')),
-      ),
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const HomeScreen(),
+        '/new-match': (context) => const NewMatchScreen(),
+      },
     );
   }
 }
