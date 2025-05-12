@@ -1,18 +1,33 @@
+import 'package:hive/hive.dart';
 import 'player.dart';
 
-enum TeamFormat {
-  twoVsTwo,    // 2x2
-  threeVsThree, // 3x3
-  fourVsFour,  // 4x4
-  sixVsSix,    // 6x6
-}
+part 'team.g.dart';
 
+@HiveType(typeId: 2)
 class Team {
+  @HiveField(0)
   final String id;
+  
+  @HiveField(1)
   final String name;
+  
+  @HiveField(2)
   final TeamFormat format;
+  
+  @HiveField(3)
   final List<Player> players;
+  
+  @HiveField(4)
   final Player? setter; // Levantador específico para o time (opcional)
+
+  factory Team.empty() {
+    return Team(
+      id: '',
+      name: '',
+      format: TeamFormat.twoVsTwo,
+      players: [],
+    );
+  }
 
   Team({
     required this.id,
@@ -21,22 +36,13 @@ class Team {
     required this.players,
     this.setter,
   }) {
-    // Validação do número de jogadores baseado no formato
-    final expectedPlayers = _getExpectedPlayersCount(format);
-    if (players.length != expectedPlayers) {
-      throw ArgumentError(
-        'Número inválido de jogadores para o formato $format. '
-        'Esperado: $expectedPlayers, Recebido: ${players.length}',
-      );
-    }
-
-    // Validação do levantador
-    if (setter != null && !setter!.isSetter) {
-      throw ArgumentError('O jogador designado como levantador deve ter a flag isSetter como true');
+    if (setter != null) {
+      if (!setter!.isSetter) {
+        throw ArgumentError('O jogador designado como levantador deve ter a flag isSetter como true');
+      }
     }
   }
 
-  // Método para obter o número esperado de jogadores baseado no formato
   int _getExpectedPlayersCount(TeamFormat format) {
     switch (format) {
       case TeamFormat.twoVsTwo:
@@ -50,7 +56,6 @@ class Team {
     }
   }
 
-  // Método para criar uma cópia do time com campos modificados
   Team copyWith({
     String? id,
     String? name,
@@ -67,18 +72,16 @@ class Team {
     );
   }
 
-  // Método para converter o time em um Map (útil para persistência)
   Map<String, dynamic> toMap() {
     return {
       'id': id,
       'name': name,
       'format': format.toString(),
-      'players': players.map((player) => player.toMap()).toList(),
+      'players': players.map((p) => p.toMap()).toList(),
       'setter': setter?.toMap(),
     };
   }
 
-  // Método para criar um time a partir de um Map
   factory Team.fromMap(Map<String, dynamic> map) {
     return Team(
       id: map['id'] as String,
@@ -87,7 +90,7 @@ class Team {
         (e) => e.toString() == map['format'],
       ),
       players: (map['players'] as List)
-          .map((playerMap) => Player.fromMap(playerMap as Map<String, dynamic>))
+          .map((p) => Player.fromMap(p as Map<String, dynamic>))
           .toList(),
       setter: map['setter'] != null
           ? Player.fromMap(map['setter'] as Map<String, dynamic>)
@@ -96,5 +99,17 @@ class Team {
   }
 
   @override
-  String toString() => 'Team(id: $id, name: $name, format: $format, players: $players, setter: $setter)';
+  String toString() => 'Team(id: $id, name: $name, format: $format, players: $players)';
+}
+
+@HiveType(typeId: 1)
+enum TeamFormat {
+  @HiveField(0)
+  twoVsTwo,    // 2x2
+  @HiveField(1)
+  threeVsThree, // 3x3
+  @HiveField(2)
+  fourVsFour,  // 4x4
+  @HiveField(3)
+  sixVsSix,    // 6x6
 } 

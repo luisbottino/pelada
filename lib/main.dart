@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'core/services/storage_service.dart';
 import 'features/home/presentation/screens/home_screen.dart';
 import 'features/match/presentation/screens/new_match_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await StorageService.init();
   runApp(const MyApp());
 }
 

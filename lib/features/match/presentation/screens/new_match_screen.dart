@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../../core/models/match.dart';
 import '../../../../core/models/team.dart';
+import '../../../../core/services/storage_service.dart';
+import 'match_players_screen.dart';
 
 class NewMatchScreen extends StatefulWidget {
   const NewMatchScreen({super.key});
@@ -14,7 +16,8 @@ class _NewMatchScreenState extends State<NewMatchScreen> {
   final _nameController = TextEditingController();
   TeamFormat _selectedFormat = TeamFormat.fourVsFour;
   bool _separateSetters = false;
-  TeamSelectionMode _selectionMode = TeamSelectionMode.random;
+  bool _randomSelection = false;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -22,19 +25,64 @@ class _NewMatchScreenState extends State<NewMatchScreen> {
     super.dispose();
   }
 
-  void _createMatch() {
-    if (_formKey.currentState!.validate()) {
-      // TODO: Implementar a criação da pelada
-      final match = Match(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: _nameController.text,
-        format: _selectedFormat,
-        separateSetters: _separateSetters,
-        teamSelectionMode: _selectionMode,
-      );
+  String _getFormatLabel(TeamFormat format) {
+    switch (format) {
+      case TeamFormat.twoVsTwo:
+        return '2x2';
+      case TeamFormat.threeVsThree:
+        return '3x3';
+      case TeamFormat.fourVsFour:
+        return '4x4';
+      case TeamFormat.sixVsSix:
+        return '6x6';
+    }
+  }
 
-      // TODO: Salvar a pelada e navegar para a próxima tela
-      Navigator.pop(context, match);
+  Future<void> _createMatch() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      try {
+        final match = Match(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          name: _nameController.text,
+          format: _selectedFormat,
+          separateSetters: _separateSetters,
+          teamSelectionMode: _randomSelection ? TeamSelectionMode.random : TeamSelectionMode.sequential,
+        );
+
+        await StorageService.saveMatch(match);
+        
+        if (mounted) {
+          final updatedMatch = await Navigator.push<Match>(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MatchPlayersScreen(match: match),
+            ),
+          );
+
+          if (updatedMatch != null) {
+            Navigator.pop(context, updatedMatch);
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erro ao criar pelada: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
     }
   }
 
@@ -59,7 +107,7 @@ class _NewMatchScreenState extends State<NewMatchScreen> {
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Por favor, insira um nome para a pelada';
+                    return 'Por favor, insira o nome da pelada';
                   }
                   return null;
                 },
@@ -91,11 +139,13 @@ class _NewMatchScreenState extends State<NewMatchScreen> {
                           );
                         }).toList(),
                         onChanged: (value) {
-                          if (value != null) {
-                            setState(() {
-                              _selectedFormat = value;
-                            });
-                          }
+                          if (value == null) return;
+                          setState(() {
+                            _selectedFormat = value;
+                            if (value == TeamFormat.twoVsTwo) {
+                              _separateSetters = false;
+                            }
+                          });
                         },
                       ),
                     ],
@@ -118,47 +168,35 @@ class _NewMatchScreenState extends State<NewMatchScreen> {
                       ),
                       const SizedBox(height: 8),
                       SwitchListTile(
-                        title: const Text('Separar Levantadores'),
+                        title: const Text('Seleção Aleatória'),
                         subtitle: const Text(
-                          'Criar uma fila separada para levantadores',
+                          'Se ativado, os times serão formados aleatoriamente. '
+                          'Caso contrário, serão formados por ordem de chegada.',
                         ),
-                        value: _separateSetters,
+                        value: _randomSelection,
                         onChanged: (value) {
                           setState(() {
-                            _separateSetters = value;
+                            _randomSelection = value;
                           });
                         },
                       ),
                       const Divider(),
-                      const Text(
-                        'Modo de Seleção dos Times',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      RadioListTile<TeamSelectionMode>(
-                        title: const Text('Aleatório'),
-                        subtitle: const Text('Sortear os times'),
-                        value: TeamSelectionMode.random,
-                        groupValue: _selectionMode,
-                        onChanged: (value) {
-                          if (value != null) {
-                            setState(() {
-                              _selectionMode = value;
-                            });
-                          }
-                        },
-                      ),
-                      RadioListTile<TeamSelectionMode>(
-                        title: const Text('Sequencial'),
-                        subtitle: const Text('Times por ordem de chegada'),
-                        value: TeamSelectionMode.sequential,
-                        groupValue: _selectionMode,
-                        onChanged: (value) {
-                          if (value != null) {
-                            setState(() {
-                              _selectionMode = value;
-                            });
-                          }
-                        },
+                      SwitchListTile(
+                        title: const Text('Separar Levantadores'),
+                        subtitle: Text(
+                          _selectedFormat == TeamFormat.twoVsTwo
+                              ? 'Não disponível para formato 2x2'
+                              : 'Se ativado, os levantadores terão uma fila separada e '
+                                  'rotacionarão entre os times.',
+                        ),
+                        value: _separateSetters,
+                        onChanged: _selectedFormat == TeamFormat.twoVsTwo
+                            ? null
+                            : (value) {
+                                setState(() {
+                                  _separateSetters = value;
+                                });
+                              },
                       ),
                     ],
                   ),
@@ -166,29 +204,24 @@ class _NewMatchScreenState extends State<NewMatchScreen> {
               ),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: _createMatch,
+                onPressed: _isLoading ? null : _createMatch,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                child: const Text('Informar Jogadores'),
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text('Criar Pelada'),
               ),
             ],
           ),
         ),
       ),
     );
-  }
-
-  String _getFormatLabel(TeamFormat format) {
-    switch (format) {
-      case TeamFormat.twoVsTwo:
-        return '2x2';
-      case TeamFormat.threeVsThree:
-        return '3x3';
-      case TeamFormat.fourVsFour:
-        return '4x4';
-      case TeamFormat.sixVsSix:
-        return '6x6';
-    }
   }
 } 

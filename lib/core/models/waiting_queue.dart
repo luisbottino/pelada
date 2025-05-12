@@ -1,7 +1,14 @@
+import 'package:hive/hive.dart';
 import 'player.dart';
 
+part 'waiting_queue.g.dart';
+
+@HiveType(typeId: 3)
 class WaitingQueue {
+  @HiveField(0)
   final List<Player> players;
+  
+  @HiveField(1)
   final List<Player> setterQueue; // Fila específica para levantadores
 
   WaitingQueue({

@@ -1,22 +1,53 @@
+import 'package:hive/hive.dart';
 import 'team.dart';
 import 'player.dart';
 import 'waiting_queue.dart';
 
+part 'match.g.dart';
+
+@HiveType(typeId: 4)
 enum TeamSelectionMode {
+  @HiveField(0)
   random,     // Seleção aleatória de times
+  @HiveField(1)
   sequential, // Seleção por ordem de chegada
 }
 
+@HiveType(typeId: 5)
 class Match {
+  @HiveField(0)
   final String id;
+  
+  @HiveField(1)
   final String name;
+  
+  @HiveField(2)
   final TeamFormat format;
+  
+  @HiveField(3)
   final bool separateSetters;
+  
+  @HiveField(4)
   final TeamSelectionMode teamSelectionMode;
+  
+  @HiveField(5)
   final List<Player> registeredPlayers;
-  final List<Team> teams;
+
+  @HiveField(6)
+  final Team teamInCourtA;
+  @HiveField(7)
+  final Team teamInCourtB;
+  @HiveField(8)
+  final Team nextTeam;
+  
+  @HiveField(9)
   final WaitingQueue waitingQueue;
+  
+  @HiveField(10)
   final DateTime createdAt;
+
+  @HiveField(11)
+  final DateTime? updatedAt;
 
   Match({
     required this.id,
@@ -25,13 +56,19 @@ class Match {
     required this.separateSetters,
     required this.teamSelectionMode,
     List<Player>? registeredPlayers,
-    List<Team>? teams,
+    Team? teamInCourtA,
+    Team? teamInCourtB,
+    Team? nextTeam,
     WaitingQueue? waitingQueue,
     DateTime? createdAt,
+    DateTime? updatedAt,
   })  : registeredPlayers = registeredPlayers ?? [],
-        teams = teams ?? [],
+        teamInCourtA = teamInCourtA ?? Team.empty(),
+        teamInCourtB = teamInCourtB ?? Team.empty(),
+        nextTeam = nextTeam ?? Team.empty(),
         waitingQueue = waitingQueue ?? WaitingQueue(),
-        createdAt = createdAt ?? DateTime.now();
+        createdAt = createdAt ?? DateTime.now(),
+        updatedAt = updatedAt;
 
   // Adiciona um jogador à lista de jogadores registrados
   Match addPlayer(Player player) {
@@ -57,57 +94,91 @@ class Match {
     }
 
     final playersPerTeam = _getExpectedPlayersCount(format);
-    final totalTeams = (registeredPlayers.length / playersPerTeam).floor();
-    
-    if (totalTeams < 2) {
+    final maxPossibleTeams = (registeredPlayers.length / playersPerTeam).floor();
+
+    if (maxPossibleTeams < 2) {
       throw ArgumentError('Número insuficiente de jogadores para formar times');
     }
 
     List<Player> availablePlayers = List.from(registeredPlayers);
-    List<Team> newTeams = [];
 
-    // Se houver separação de levantadores, garante que cada time tenha um
     if (separateSetters) {
-      final setters = availablePlayers.where((p) => p.isSetter).toList();
-      if (setters.length < totalTeams) {
+      final setters = List<Player>.from(availablePlayers.where((p) => p.isSetter));
+      final nonSetters = List<Player>.from(availablePlayers.where((p) => !p.isSetter));
+
+      if (setters.length < 2) {
         throw ArgumentError('Número insuficiente de levantadores para os times');
       }
-    }
 
-    for (int i = 0; i < totalTeams; i++) {
-      List<Player> teamPlayers = [];
-      
-      // Seleciona jogadores baseado no modo de seleção
+      if (teamSelectionMode == TeamSelectionMode.random) {
+        setters.shuffle();
+        nonSetters.shuffle();
+      }
+
+      final teamA = createTeam('Time A', nonSetters, setters);
+      final teamB = createTeam('Time B', nonSetters, setters);
+      final nextTeam = createTeam('Próxima', nonSetters, setters);
+
+      final newWaitingQueue = WaitingQueue(
+        players: nonSetters,
+        setterQueue: setters,
+      );
+
+      return copyWith(
+        teamInCourtA: teamA,
+        teamInCourtB: teamB,
+        nextTeam: nextTeam,
+        waitingQueue: newWaitingQueue,
+        updatedAt: DateTime.now(),
+      );
+    } else {
+      // Sem separação de levantadores
       if (teamSelectionMode == TeamSelectionMode.random) {
         availablePlayers.shuffle();
       }
 
-      // Adiciona jogadores ao time
-      for (int j = 0; j < playersPerTeam; j++) {
-        if (availablePlayers.isEmpty) break;
-        teamPlayers.add(availablePlayers.removeAt(0));
+      final teamA = createTeam('Time A', availablePlayers, List.empty());
+      final teamB = createTeam('Time B', availablePlayers, List.empty());
+      final nextTeam = createTeam('Próxima', availablePlayers, List.empty());
+
+      // Todos os jogadores restantes vão para a fila de espera
+      final newWaitingQueue = WaitingQueue(
+        players: availablePlayers,
+        setterQueue: [],
+      );
+
+      return copyWith(
+        teamInCourtA: teamA,
+        teamInCourtB: teamB,
+        nextTeam: nextTeam,
+        waitingQueue: newWaitingQueue,
+        updatedAt: DateTime.now(),
+      );
+    }
+  }
+
+  Team createTeam(String name, List<Player> availablePlayers, List<Player> availableSetters) {
+    if (availablePlayers.isNotEmpty) {
+      Player? setter;
+      if (availableSetters.isNotEmpty) {
+        setter = availableSetters.removeAt(0);
       }
 
-      // Cria o time
-      newTeams.add(Team(
-        id: 'team_${i + 1}',
-        name: 'Time ${i + 1}',
+      final players = <Player>[];
+      while (players.length < _getExpectedPlayersCount(format) - (separateSetters ? 1 : 0) && availablePlayers.isNotEmpty) {
+        players.add(availablePlayers.removeAt(0));
+      }
+
+      return Team(
+        id: 'team_${DateTime.now().millisecondsSinceEpoch.toString()}',
+        name: name,
         format: format,
-        players: teamPlayers,
-        setter: separateSetters ? teamPlayers.firstWhere((p) => p.isSetter) : null,
-      ));
+        players: players,
+        setter: setter,
+      );
+    } else {
+      return Team.empty();
     }
-
-    // Adiciona jogadores restantes à fila de espera
-    final newWaitingQueue = availablePlayers.fold<WaitingQueue>(
-      waitingQueue,
-      (queue, player) => queue.addPlayer(player),
-    );
-
-    return copyWith(
-      teams: newTeams,
-      waitingQueue: newWaitingQueue,
-    );
   }
 
   // Método para obter o número esperado de jogadores baseado no formato
@@ -132,9 +203,12 @@ class Match {
     bool? separateSetters,
     TeamSelectionMode? teamSelectionMode,
     List<Player>? registeredPlayers,
-    List<Team>? teams,
+    Team? teamInCourtA,
+    Team? teamInCourtB,
+    Team? nextTeam,
     WaitingQueue? waitingQueue,
     DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return Match(
       id: id ?? this.id,
@@ -143,9 +217,12 @@ class Match {
       separateSetters: separateSetters ?? this.separateSetters,
       teamSelectionMode: teamSelectionMode ?? this.teamSelectionMode,
       registeredPlayers: registeredPlayers ?? this.registeredPlayers,
-      teams: teams ?? this.teams,
+      teamInCourtA: teamInCourtA,
+      teamInCourtB: teamInCourtB,
+      nextTeam: nextTeam,
       waitingQueue: waitingQueue ?? this.waitingQueue,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
@@ -158,9 +235,12 @@ class Match {
       'separateSetters': separateSetters,
       'teamSelectionMode': teamSelectionMode.toString(),
       'registeredPlayers': registeredPlayers.map((p) => p.toMap()).toList(),
-      'teams': teams.map((t) => t.toMap()).toList(),
+      'teamInCourtA': teamInCourtA.toMap(),
+      'teamInCourtB': teamInCourtB.toMap(),
+      'nextTeam': nextTeam.toMap(),
       'waitingQueue': waitingQueue.toMap(),
       'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt?.toIso8601String(),
     };
   }
 
@@ -179,14 +259,15 @@ class Match {
       registeredPlayers: (map['registeredPlayers'] as List)
           .map((p) => Player.fromMap(p as Map<String, dynamic>))
           .toList(),
-      teams: (map['teams'] as List)
-          .map((t) => Team.fromMap(t as Map<String, dynamic>))
-          .toList(),
+      teamInCourtA: Team.fromMap(map['teamInCourtA'] as Map<String, dynamic>),
+      teamInCourtB: Team.fromMap(map['teamInCourtB'] as Map<String, dynamic>),
+      nextTeam: Team.fromMap(map['nextTeam'] as Map<String, dynamic>),
       waitingQueue: WaitingQueue.fromMap(map['waitingQueue'] as Map<String, dynamic>),
       createdAt: DateTime.parse(map['createdAt'] as String),
+      updatedAt: map['updatedAt'] != null ? DateTime.parse(map['updatedAt'] as String) : null,
     );
   }
 
   @override
-  String toString() => 'Match(id: $id, name: $name, format: $format, teams: $teams)';
-} 
+  String toString() => 'Match(id: $id, name: $name, format: $format, teamInCoutA: $teamInCourtA, teamInCoutB: $teamInCourtB, nextTeam: $nextTeam)';
+}

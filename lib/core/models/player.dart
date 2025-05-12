@@ -1,6 +1,16 @@
+import 'package:hive/hive.dart';
+
+part 'player.g.dart';
+
+@HiveType(typeId: 0)
 class Player {
+  @HiveField(0)
   final String id;
+  
+  @HiveField(1)
   final String name;
+  
+  @HiveField(2)
   final bool isSetter; // Indica se o jogador é levantador
 
   Player({
