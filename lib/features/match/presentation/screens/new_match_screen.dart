@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pelada/features/match/presentation/components/app_logo_bar.dart';
 import '../../../../core/models/match.dart';
 import '../../../../core/models/team.dart';
 import '../../../../core/services/storage_service.dart';
@@ -90,7 +91,26 @@ class _NewMatchScreenState extends State<NewMatchScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Nova Pelada'),
+        title: AppLogoBar(),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton.icon(
+              onPressed: _createMatch,
+              icon: const Icon(Icons.add, size: 28, color: Colors.white),
+              label: const Text('Criar Pelada', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              style: ElevatedButton.styleFrom(
+                foregroundColor: Colors.white,
+                elevation: 6,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+            )
+          )
+        )
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -202,22 +222,23 @@ class _NewMatchScreenState extends State<NewMatchScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _isLoading ? null : _createMatch,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text('Criar Pelada'),
-              ),
+              // const SizedBox(height: 24),
+              // ElevatedButton(
+              //   onPressed: _isLoading ? null : _createMatch,
+              //   style: ElevatedButton.styleFrom(
+              //     foregroundColor: Colors.white,
+              //     padding: const EdgeInsets.symmetric(vertical: 16),
+              //   ),
+              //   child: _isLoading
+              //       ? const SizedBox(
+              //           height: 20,
+              //           width: 20,
+              //           child: CircularProgressIndicator(
+              //             strokeWidth: 2,
+              //           ),
+              //         )
+              //       : const Text('Criar Pelada'),
+              // ),
             ],
           ),
         ),

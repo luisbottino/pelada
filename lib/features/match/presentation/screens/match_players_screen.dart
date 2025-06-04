@@ -3,6 +3,7 @@ import '../../../../core/models/match.dart';
 import '../../../../core/models/team.dart';
 import '../../../../core/models/player.dart';
 import '../../../../core/services/storage_service.dart';
+import '../components/app_logo_bar.dart';
 import 'match_teams_screen.dart';
 
 class MatchPlayersScreen extends StatefulWidget {
@@ -22,12 +23,14 @@ class _MatchPlayersScreenState extends State<MatchPlayersScreen> {
   final _nameController = TextEditingController();
   bool _isSetter = false;
   bool _isLoading = false;
-  List<Player> _registeredPlayers = [];
+  List<Player> _players = [];
+  List<Player> _setters = [];
 
   @override
   void initState() {
     super.initState();
-    _registeredPlayers = List.from(widget.match.registeredPlayers);
+    _players = List.from(widget.match.players);
+    _players = List.from(widget.match.setters);
   }
 
   @override
@@ -50,12 +53,17 @@ class _MatchPlayersScreenState extends State<MatchPlayersScreen> {
         );
 
         // Verifica se já existe um jogador com o mesmo nome
-        if (_registeredPlayers.any((p) => p.name.toLowerCase() == player.name.toLowerCase())) {
+        if (_players.any((p) => p.name.toLowerCase() == player.name.toLowerCase())
+        || _setters.any((p) => p.name.toLowerCase() == player.name.toLowerCase())) {
           throw Exception('Já existe um jogador com este nome');
         }
 
         setState(() {
-          _registeredPlayers.add(player);
+          if (_isSetter) {
+            _setters.add(player);
+          } else {
+            _players.add(player);
+          }
         });
 
         _nameController.clear();
@@ -81,7 +89,11 @@ class _MatchPlayersScreenState extends State<MatchPlayersScreen> {
 
   Future<void> _removePlayer(Player player) async {
     setState(() {
-      _registeredPlayers.remove(player);
+      if (player.isSetter) {
+        _setters.remove(player);
+      } else {
+        _players.remove(player);
+      }
     });
   }
 
@@ -90,7 +102,7 @@ class _MatchPlayersScreenState extends State<MatchPlayersScreen> {
     final playersPerTeam = _getPlayersPerTeam();
     final minPlayers = playersPerTeam * 2; // Mínimo para 2 times
 
-    if (_registeredPlayers.length < minPlayers) {
+    if (_players.length < minPlayers) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -103,7 +115,7 @@ class _MatchPlayersScreenState extends State<MatchPlayersScreen> {
     }
 
     // Se a opção de separar levantadores estiver ativa, verifica se tem pelo menos 2
-    if (widget.match.separateSetters && _registeredPlayers.where((p) => !p.isSetter).toList().length < 2) {
+    if (widget.match.separateSetters && _setters.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('É necessário ter pelo menos 2 levantadores'),
@@ -120,7 +132,8 @@ class _MatchPlayersScreenState extends State<MatchPlayersScreen> {
     try {
       // Atualiza a pelada com os jogadores registrados
       final updatedMatch = widget.match.copyWith(
-        registeredPlayers: _registeredPlayers,
+        players: _players,
+        setters: _setters
       );
 
       // Salva a pelada atualizada
@@ -170,7 +183,7 @@ class _MatchPlayersScreenState extends State<MatchPlayersScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Jogadores'),
+        title: AppLogoBar(),
       ),
       body: Column(
         children: [
@@ -182,7 +195,7 @@ class _MatchPlayersScreenState extends State<MatchPlayersScreen> {
                       Expanded(
                         child: _buildPlayersList(
                           title: 'Jogadores',
-                          players: _registeredPlayers.where((p) => !p.isSetter).toList(),
+                          players: _players,
                         ),
                       ),
                       const VerticalDivider(),
@@ -190,14 +203,14 @@ class _MatchPlayersScreenState extends State<MatchPlayersScreen> {
                       Expanded(
                         child: _buildPlayersList(
                           title: 'Levantadores',
-                          players: _registeredPlayers.where((p) => p.isSetter).toList(),
+                          players: _setters,
                         ),
                       ),
                     ],
                   )
                 : _buildPlayersList(
                     title: 'Jogadores',
-                    players: _registeredPlayers,
+                    players: _players,
                   ),
           ),
           // Formulário para adicionar jogador
@@ -240,6 +253,7 @@ class _MatchPlayersScreenState extends State<MatchPlayersScreen> {
                           onPressed: _isLoading ? null : _addPlayer,
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
+                            foregroundColor: Colors.white
                           ),
                           child: _isLoading
                               ? const SizedBox(
@@ -249,7 +263,7 @@ class _MatchPlayersScreenState extends State<MatchPlayersScreen> {
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : const Text('Adicionar Jogador'),
+                              : const Text('Adicionar Jogador', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -259,8 +273,9 @@ class _MatchPlayersScreenState extends State<MatchPlayersScreen> {
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             backgroundColor: Colors.green,
+                            foregroundColor: Colors.white
                           ),
-                          child: const Text('Criar times'),
+                          child: const Text('Criar times', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                         ),
                       ),
                     ],

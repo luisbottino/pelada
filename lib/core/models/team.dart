@@ -20,12 +20,16 @@ class Team {
   @HiveField(4)
   final Player? setter; // Levantador específico para o time (opcional)
 
+  @HiveField(5)
+  final int victories;
+
   factory Team.empty() {
     return Team(
       id: '',
       name: '',
       format: TeamFormat.twoVsTwo,
       players: [],
+      victories: 0
     );
   }
 
@@ -34,6 +38,7 @@ class Team {
     required this.name,
     required this.format,
     required this.players,
+    required this.victories,
     this.setter,
   }) {
     if (setter != null) {
@@ -62,6 +67,7 @@ class Team {
     TeamFormat? format,
     List<Player>? players,
     Player? setter,
+    int? victories,
   }) {
     return Team(
       id: id ?? this.id,
@@ -69,6 +75,7 @@ class Team {
       format: format ?? this.format,
       players: players ?? this.players,
       setter: setter ?? this.setter,
+      victories: victories ?? this.victories,
     );
   }
 
@@ -95,11 +102,21 @@ class Team {
       setter: map['setter'] != null
           ? Player.fromMap(map['setter'] as Map<String, dynamic>)
           : null,
+      victories: map['victories'] as int
     );
   }
 
   @override
-  String toString() => 'Team(id: $id, name: $name, format: $format, players: $players)';
+  String toString() => 'Team(id: $id, name: $name, format: $format, players: $players, setter: $setter, victories: $victories)';
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is Team && other.id == id;
+  }
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
 @HiveType(typeId: 1)

@@ -2,6 +2,7 @@ import 'package:hive/hive.dart';
 import 'team.dart';
 import 'player.dart';
 import 'waiting_queue.dart';
+import '../extensions/match_helpers.dart';
 
 part 'match.g.dart';
 
@@ -31,22 +32,25 @@ class Match {
   final TeamSelectionMode teamSelectionMode;
   
   @HiveField(5)
-  final List<Player> registeredPlayers;
+  final List<Player> players;
 
   @HiveField(6)
-  final Team teamInCourtA;
+  final List<Player> setters;
+
   @HiveField(7)
-  final Team teamInCourtB;
+  final Team teamInCourtA;
   @HiveField(8)
+  final Team teamInCourtB;
+  @HiveField(9)
   final Team nextTeam;
   
-  @HiveField(9)
+  @HiveField(10)
   final WaitingQueue waitingQueue;
   
-  @HiveField(10)
+  @HiveField(11)
   final DateTime createdAt;
 
-  @HiveField(11)
+  @HiveField(12)
   final DateTime? updatedAt;
 
   Match({
@@ -55,14 +59,16 @@ class Match {
     required this.format,
     required this.separateSetters,
     required this.teamSelectionMode,
-    List<Player>? registeredPlayers,
+    List<Player>? players,
+    List<Player>? setters,
     Team? teamInCourtA,
     Team? teamInCourtB,
     Team? nextTeam,
     WaitingQueue? waitingQueue,
     DateTime? createdAt,
     DateTime? updatedAt,
-  })  : registeredPlayers = registeredPlayers ?? [],
+  })  : players = players ?? [],
+        setters = setters ?? [],
         teamInCourtA = teamInCourtA ?? Team.empty(),
         teamInCourtB = teamInCourtB ?? Team.empty(),
         nextTeam = nextTeam ?? Team.empty(),
@@ -70,65 +76,43 @@ class Match {
         createdAt = createdAt ?? DateTime.now(),
         updatedAt = updatedAt;
 
-  // Adiciona um jogador à lista de jogadores registrados
-  Match addPlayer(Player player) {
-    if (registeredPlayers.any((p) => p.id == player.id)) {
-      throw ArgumentError('Jogador já registrado nesta pelada');
-    }
-    return copyWith(
-      registeredPlayers: [...registeredPlayers, player],
-    );
-  }
-
-  // Remove um jogador da lista de jogadores registrados
-  Match removePlayer(Player player) {
-    return copyWith(
-      registeredPlayers: registeredPlayers.where((p) => p.id != player.id).toList(),
-    );
-  }
 
   // Gera os times baseado no modo de seleção
   Match generateTeams() {
-    if (registeredPlayers.isEmpty) {
+    if (players.isEmpty) {
       throw ArgumentError('Não há jogadores registrados para gerar times');
     }
 
-    final playersPerTeam = _getExpectedPlayersCount(format);
-    final maxPossibleTeams = (registeredPlayers.length / playersPerTeam).floor();
+    final playersPerTeam = getExpectedPlayersCount(format);
+    final maxPossibleTeams = ((players.length + setters.length) / playersPerTeam).floor();
 
     if (maxPossibleTeams < 2) {
       throw ArgumentError('Número insuficiente de jogadores para formar times');
     }
 
-    List<Player> availablePlayers = List.from(registeredPlayers);
+    List<Player> availablePlayers = [...players];
 
     if (separateSetters) {
-      final setters = List<Player>.from(availablePlayers.where((p) => p.isSetter));
-      final nonSetters = List<Player>.from(availablePlayers.where((p) => !p.isSetter));
+      final availableSetters = [...setters];
 
-      if (setters.length < 2) {
+      if (availableSetters.length < 2) {
         throw ArgumentError('Número insuficiente de levantadores para os times');
       }
 
       if (teamSelectionMode == TeamSelectionMode.random) {
-        setters.shuffle();
-        nonSetters.shuffle();
+        availableSetters.shuffle();
+        availablePlayers.shuffle();
       }
 
-      final teamA = createTeam('Time A', nonSetters, setters);
-      final teamB = createTeam('Time B', nonSetters, setters);
-      final nextTeam = createTeam('Próxima', nonSetters, setters);
-
-      final newWaitingQueue = WaitingQueue(
-        players: nonSetters,
-        setterQueue: setters,
-      );
+      final teamA = createTeam('Time A', availablePlayers, availableSetters);
+      final teamB = createTeam('Time B', availablePlayers, availableSetters);
+      final nextTeam = createTeam('Próxima', availablePlayers, availableSetters);
 
       return copyWith(
         teamInCourtA: teamA,
         teamInCourtB: teamB,
         nextTeam: nextTeam,
-        waitingQueue: newWaitingQueue,
+        waitingQueue: WaitingQueue(players: availablePlayers, setterQueue: availableSetters),
         updatedAt: DateTime.now(),
       );
     } else {
@@ -141,58 +125,108 @@ class Match {
       final teamB = createTeam('Time B', availablePlayers, List.empty());
       final nextTeam = createTeam('Próxima', availablePlayers, List.empty());
 
-      // Todos os jogadores restantes vão para a fila de espera
-      final newWaitingQueue = WaitingQueue(
-        players: availablePlayers,
-        setterQueue: [],
-      );
-
       return copyWith(
         teamInCourtA: teamA,
         teamInCourtB: teamB,
         nextTeam: nextTeam,
-        waitingQueue: newWaitingQueue,
+        waitingQueue: WaitingQueue(players: availablePlayers, setterQueue: []),
         updatedAt: DateTime.now(),
       );
     }
   }
 
-  Team createTeam(String name, List<Player> availablePlayers, List<Player> availableSetters) {
-    if (availablePlayers.isNotEmpty) {
-      Player? setter;
-      if (availableSetters.isNotEmpty) {
-        setter = availableSetters.removeAt(0);
-      }
+  Match processNextRound({required Team winningTeam}) {
+    if (!hasNextTeamPlayers()) return this;
+    final (losingTeamName, losingPlayers, losingSetter) = getLosingTeamData(winningTeam);
 
-      final players = <Player>[];
-      while (players.length < _getExpectedPlayersCount(format) - (separateSetters ? 1 : 0) && availablePlayers.isNotEmpty) {
-        players.add(availablePlayers.removeAt(0));
-      }
+    Team nextRoundTeam;
+    Team newNextTeam;
 
-      return Team(
-        id: 'team_${DateTime.now().millisecondsSinceEpoch.toString()}',
-        name: name,
-        format: format,
-        players: players,
-        setter: setter,
-      );
+    final playersQueue = [...waitingQueue.players];
+    final settersQueue = [...waitingQueue.setterQueue];
+
+    if (separateSetters) {
+
+      if(isNextTeamComplete()) {
+        final nextSetter = resolveNextSetter(losingSetter, settersQueue);
+        final nextPlayers = takePlayers(playersQueue, playersPerTeam - 1);
+
+        newNextTeam = buildTeam(
+          name: 'Próxima',
+          players: nextPlayers,
+          setter: nextSetter,
+        );
+
+        nextRoundTeam = buildTeam(
+          name: losingTeamName,
+          players: [...nextTeam.players],
+          setter: nextTeam.setter,
+        );
+
+        playersQueue.addAll(losingPlayers);
+      } else {
+        final nextRoundPlayers = [...nextTeam.players];
+        nextRoundPlayers.addAll(takePlayers(losingPlayers, playersPerTeam - 1 - nextRoundPlayers.length));
+
+        final nextRoundSetter = nextTeam.setter ?? losingSetter!;
+        final nextSetter = nextTeam.setter != null ? losingSetter : null;
+
+        nextRoundTeam = buildTeam(
+          name: losingTeamName,
+          players: nextRoundPlayers,
+          setter: nextRoundSetter,
+        );
+
+        newNextTeam = buildTeam(
+          name: 'Próxima',
+          players: losingPlayers,
+          setter: nextSetter,
+        );
+      }
     } else {
-      return Team.empty();
-    }
-  }
+      if (isNextTeamComplete()) {
+        nextRoundTeam = buildTeam(
+          name: losingTeamName,
+          players: [...nextTeam.players],
+        );
 
-  // Método para obter o número esperado de jogadores baseado no formato
-  int _getExpectedPlayersCount(TeamFormat format) {
-    switch (format) {
-      case TeamFormat.twoVsTwo:
-        return 2;
-      case TeamFormat.threeVsThree:
-        return 3;
-      case TeamFormat.fourVsFour:
-        return 4;
-      case TeamFormat.sixVsSix:
-        return 6;
+        final nextPlayers = takePlayers(playersQueue, playersPerTeam);
+
+        if (nextPlayers.length < playersPerTeam) {
+          nextPlayers.addAll(takePlayers(losingPlayers, playersPerTeam - nextPlayers.length));
+        }
+
+        newNextTeam = buildTeam(
+          name: 'Próxima',
+          players: nextPlayers,
+        );
+        playersQueue.addAll(losingPlayers);
+      } else {
+        final nextRoundPlayers = [...nextTeam.players];
+        nextRoundPlayers.addAll(takePlayers(losingPlayers, playersPerTeam - nextRoundPlayers.length));
+
+        nextRoundTeam = buildTeam(
+          name: losingTeamName,
+          players: nextRoundPlayers,
+        );
+
+        newNextTeam = buildTeam(
+          name: 'Próxima',
+          players: losingPlayers,
+        );
+      }
     }
+
+    return copyWith(
+      teamInCourtA: teamInCourtA == winningTeam ? teamInCourtA.copyWith(victories: teamInCourtA.victories + 1) : nextRoundTeam,
+      teamInCourtB: teamInCourtA == winningTeam ? nextRoundTeam : teamInCourtB.copyWith(victories: teamInCourtB.victories + 1),
+      nextTeam: newNextTeam,
+      waitingQueue: WaitingQueue(
+        players: playersQueue,
+        setterQueue: settersQueue,
+      ),
+      updatedAt: DateTime.now(),
+    );
   }
 
   // Cria uma cópia da pelada com campos modificados
@@ -202,7 +236,8 @@ class Match {
     TeamFormat? format,
     bool? separateSetters,
     TeamSelectionMode? teamSelectionMode,
-    List<Player>? registeredPlayers,
+    List<Player>? players,
+    List<Player>? setters,
     Team? teamInCourtA,
     Team? teamInCourtB,
     Team? nextTeam,
@@ -216,7 +251,8 @@ class Match {
       format: format ?? this.format,
       separateSetters: separateSetters ?? this.separateSetters,
       teamSelectionMode: teamSelectionMode ?? this.teamSelectionMode,
-      registeredPlayers: registeredPlayers ?? this.registeredPlayers,
+      players: players ?? this.players,
+      setters: setters ?? this.setters,
       teamInCourtA: teamInCourtA,
       teamInCourtB: teamInCourtB,
       nextTeam: nextTeam,
@@ -234,7 +270,8 @@ class Match {
       'format': format.toString(),
       'separateSetters': separateSetters,
       'teamSelectionMode': teamSelectionMode.toString(),
-      'registeredPlayers': registeredPlayers.map((p) => p.toMap()).toList(),
+      'players': players.map((p) => p.toMap()).toList(),
+      'setters': setters.map((p) => p.toMap()).toList(),
       'teamInCourtA': teamInCourtA.toMap(),
       'teamInCourtB': teamInCourtB.toMap(),
       'nextTeam': nextTeam.toMap(),
@@ -256,7 +293,10 @@ class Match {
       teamSelectionMode: TeamSelectionMode.values.firstWhere(
         (e) => e.toString() == map['teamSelectionMode'],
       ),
-      registeredPlayers: (map['registeredPlayers'] as List)
+      players: (map['players'] as List)
+          .map((p) => Player.fromMap(p as Map<String, dynamic>))
+          .toList(),
+      setters: (map['setters'] as List)
           .map((p) => Player.fromMap(p as Map<String, dynamic>))
           .toList(),
       teamInCourtA: Team.fromMap(map['teamInCourtA'] as Map<String, dynamic>),
