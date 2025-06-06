@@ -104,9 +104,9 @@ class Match {
         availablePlayers.shuffle();
       }
 
-      final teamA = createTeam('Time A', availablePlayers, availableSetters);
-      final teamB = createTeam('Time B', availablePlayers, availableSetters);
-      final nextTeam = createTeam('Próxima', availablePlayers, availableSetters);
+      final teamA = createTeam('Time A', availablePlayers, availableSetters, teamInCourtA.victories);
+      final teamB = createTeam('Time B', availablePlayers, availableSetters, teamInCourtB.victories);
+      final nextTeam = createTeam('Próxima', availablePlayers, availableSetters, 0);
 
       return copyWith(
         teamInCourtA: teamA,
@@ -121,9 +121,9 @@ class Match {
         availablePlayers.shuffle();
       }
 
-      final teamA = createTeam('Time A', availablePlayers, List.empty());
-      final teamB = createTeam('Time B', availablePlayers, List.empty());
-      final nextTeam = createTeam('Próxima', availablePlayers, List.empty());
+      final teamA = createTeam('Time A', availablePlayers, List.empty(), teamInCourtA.victories);
+      final teamB = createTeam('Time B', availablePlayers, List.empty(), teamInCourtB.victories);
+      final nextTeam = createTeam('Próxima', availablePlayers, List.empty(), 0);
 
       return copyWith(
         teamInCourtA: teamA,
@@ -146,43 +146,36 @@ class Match {
     final settersQueue = [...waitingQueue.setterQueue];
 
     if (separateSetters) {
+      final nextRoundPlayers = resolveNextPlayers(losingPlayers, nextTeam.players, playersPerTeam - 1);
+      final nextPlayers = resolveNextPlayers(losingPlayers, playersQueue, playersPerTeam - 1);
 
-      if(isNextTeamComplete()) {
-        final nextSetter = resolveNextSetter(losingSetter, settersQueue);
-        final nextPlayers = takePlayers(playersQueue, playersPerTeam - 1);
-
-        newNextTeam = buildTeam(
-          name: 'Próxima',
-          players: nextPlayers,
-          setter: nextSetter,
-        );
-
-        nextRoundTeam = buildTeam(
-          name: losingTeamName,
-          players: [...nextTeam.players],
-          setter: nextTeam.setter,
-        );
-
-        playersQueue.addAll(losingPlayers);
+      var nextRoundSetter;
+      var nextSetter;
+      if(nextTeam.setter != null) {
+        nextRoundSetter = nextTeam.setter;
+        if (settersQueue.isNotEmpty) {
+          nextSetter = settersQueue.removeAt(0);
+          settersQueue.add(losingSetter!);
+        } else {
+          nextSetter = losingSetter!;
+        }
       } else {
-        final nextRoundPlayers = [...nextTeam.players];
-        nextRoundPlayers.addAll(takePlayers(losingPlayers, playersPerTeam - 1 - nextRoundPlayers.length));
-
-        final nextRoundSetter = nextTeam.setter ?? losingSetter!;
-        final nextSetter = nextTeam.setter != null ? losingSetter : null;
-
-        nextRoundTeam = buildTeam(
-          name: losingTeamName,
-          players: nextRoundPlayers,
-          setter: nextRoundSetter,
-        );
-
-        newNextTeam = buildTeam(
-          name: 'Próxima',
-          players: losingPlayers,
-          setter: nextSetter,
-        );
+        nextRoundSetter = losingSetter;
       }
+
+      newNextTeam = buildTeam(
+        name: 'Próxima',
+        players: nextPlayers,
+        setter: nextSetter,
+      );
+
+      nextRoundTeam = buildTeam(
+        name: losingTeamName,
+        players: nextRoundPlayers,
+        setter: nextRoundSetter,
+      );
+
+      playersQueue.addAll(losingPlayers);
     } else {
       if (isNextTeamComplete()) {
         nextRoundTeam = buildTeam(
@@ -217,14 +210,40 @@ class Match {
       }
     }
 
+    final updatedTeamInCourtA = teamInCourtA == winningTeam
+        ? teamInCourtA.copyWith(victories: teamInCourtA.victories + 1)
+        : nextRoundTeam;
+
+    final updatedTeamInCourtB = teamInCourtA == winningTeam
+        ? nextRoundTeam
+        : teamInCourtB.copyWith(victories: teamInCourtB.victories + 1);
+
+    final updatedPlayers = [
+      ...updatedTeamInCourtA.players,
+      ...updatedTeamInCourtB.players,
+      ...newNextTeam.players,
+      ...playersQueue,
+    ];
+
+    final updatedSetters = separateSetters
+        ? [
+      if (updatedTeamInCourtA.setter != null) updatedTeamInCourtA.setter!,
+      if (updatedTeamInCourtB.setter != null) updatedTeamInCourtB.setter!,
+      if (newNextTeam.setter != null) newNextTeam.setter!,
+      ...settersQueue,
+    ]
+        : setters;
+
     return copyWith(
-      teamInCourtA: teamInCourtA == winningTeam ? teamInCourtA.copyWith(victories: teamInCourtA.victories + 1) : nextRoundTeam,
-      teamInCourtB: teamInCourtA == winningTeam ? nextRoundTeam : teamInCourtB.copyWith(victories: teamInCourtB.victories + 1),
+      teamInCourtA: updatedTeamInCourtA,
+      teamInCourtB: updatedTeamInCourtB,
       nextTeam: newNextTeam,
       waitingQueue: WaitingQueue(
         players: playersQueue,
         setterQueue: settersQueue,
       ),
+      players: updatedPlayers,
+      setters: updatedSetters,
       updatedAt: DateTime.now(),
     );
   }
@@ -253,9 +272,9 @@ class Match {
       teamSelectionMode: teamSelectionMode ?? this.teamSelectionMode,
       players: players ?? this.players,
       setters: setters ?? this.setters,
-      teamInCourtA: teamInCourtA,
-      teamInCourtB: teamInCourtB,
-      nextTeam: nextTeam,
+      teamInCourtA: teamInCourtA ?? this.teamInCourtA,
+      teamInCourtB: teamInCourtB ?? this.teamInCourtB,
+      nextTeam: nextTeam ?? this.nextTeam,
       waitingQueue: waitingQueue ?? this.waitingQueue,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

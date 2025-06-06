@@ -8,7 +8,7 @@
 PRODUCT_NAME = pelada
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.example.pelada
+PRODUCT_BUNDLE_IDENTIFIER = com.bottino.pelada
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2025 com.example. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2025 com.bottino. All rights reserved.

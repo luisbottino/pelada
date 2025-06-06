@@ -19,6 +19,7 @@ class MatchTeamsScreen extends StatefulWidget {
 
 class _MatchTeamsScreenState extends State<MatchTeamsScreen> {
   final primaryColor = Color(0xFF1976D2);
+  final secondaryColor = Color(0xFF05BD00);
   late Match _match;
   bool _isLoading = false;
 
@@ -120,7 +121,7 @@ class _MatchTeamsScreenState extends State<MatchTeamsScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _buildTitleForPlayerList(title: 'Jogadores'),
+                                  if (_match.waitingQueue.players.isNotEmpty) _buildTitleForPlayerList(title: 'Jogadores'),
                                   _buildWaitingQueue(
                                     players: _match.waitingQueue.players,
                                   ),
@@ -132,7 +133,7 @@ class _MatchTeamsScreenState extends State<MatchTeamsScreen> {
                               child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    _buildTitleForPlayerList(title: 'Levantadores'),
+                                    if (_match.waitingQueue.setterQueue.isNotEmpty) _buildTitleForPlayerList(title: 'Levantadores'),
                                     _buildWaitingQueue(
                                       players: _match.waitingQueue.setterQueue,
                                     )
@@ -359,11 +360,14 @@ class _MatchTeamsScreenState extends State<MatchTeamsScreen> {
                 children: [
                   Expanded(
                     child: ElevatedButton.icon(
-                      icon: const Icon(Icons.groups, color: Colors.green,),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: secondaryColor
+                      ),
+                      icon: const Icon(Icons.groups, color: Colors.white,),
                       label: Text(
                         _match.teamInCourtA.name,
                         style: TextStyle(
-                            color: Colors.green
+                            color: Colors.white
                         ),
                       ),
                       onPressed: () {
@@ -375,11 +379,14 @@ class _MatchTeamsScreenState extends State<MatchTeamsScreen> {
                   SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton.icon(
-                      icon: const Icon(Icons.groups, color: Colors.blue),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor
+                      ),
+                      icon: const Icon(Icons.groups, color: Colors.white),
                       label: Text(
                         _match.teamInCourtB.name,
                         style: TextStyle(
-                            color: Colors.blue
+                            color: Colors.white
                         ),
                       ),
                       onPressed: () {

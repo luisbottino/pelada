@@ -39,6 +39,16 @@ extension MatchHelpers on Match {
     return fallbackSetter!;
   }
 
+  List<Player> resolveNextPlayers(List<Player> fallbackPlayers, List<Player> playersQueue, int count) {
+    final result = takePlayers(playersQueue, count);
+
+    if (result.length < count) {
+      result.addAll(takePlayers(fallbackPlayers, count - result.length));
+    }
+
+    return result;
+  }
+
   /// Cria uma instância de [Team] com os dados fornecidos, incluindo nome, jogadores e levantador.
   Team buildTeam({
     required String name,
@@ -56,7 +66,7 @@ extension MatchHelpers on Match {
   }
 
   /// Cria um time removendo jogadores e, se necessário, um levantador das listas fornecidas.
-  Team createTeam(String name, List<Player> availablePlayers, List<Player> availableSetters) {
+  Team createTeam(String name, List<Player> availablePlayers, List<Player> availableSetters, int victories) {
     Player? setter;
     if (availableSetters.isNotEmpty) {
       setter = availableSetters.removeAt(0);
@@ -73,7 +83,7 @@ extension MatchHelpers on Match {
       format: format,
       players: players,
       setter: setter,
-      victories: 0
+      victories: victories
     );
   }
 

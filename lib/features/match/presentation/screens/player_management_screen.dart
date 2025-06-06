@@ -22,11 +22,15 @@ class PlayersManagementScreen extends StatefulWidget {
 class _PlayersManagementScreenState extends State<PlayersManagementScreen> {
   late List<Player> _players;
   late List<Player> _setters;
+  late int _playersPerTeam;
+
   final _formKeyAddPlayer = GlobalKey<FormState>();
   final _formKeyReorder = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
+  final setterPerTeam = 1;
   bool _isLoading = false;
   bool _newPlayerIsSetter = false;
+
 
   @override
   void dispose() {
@@ -39,6 +43,8 @@ class _PlayersManagementScreenState extends State<PlayersManagementScreen> {
     super.initState();
     _players = List.from(widget.match.players);
     _setters = List.from(widget.match.setters);
+    _playersPerTeam = widget.match.separateSetters ? widget.match.playersPerTeam - 1 : widget.match.playersPerTeam;
+
   }
 
   Match _getUpdatedMatch() {
@@ -249,8 +255,6 @@ class _PlayersManagementScreenState extends State<PlayersManagementScreen> {
     required Function(int, int) onReorder,
     required bool isSetterList,
   }) {
-    final playersPerTeam = widget.match.separateSetters ? widget.match.playersPerTeam - 1 : widget.match.playersPerTeam;
-    final setterPerTeam = 1;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -285,11 +289,11 @@ class _PlayersManagementScreenState extends State<PlayersManagementScreen> {
                   teamDisplay = TeamDisplay(label: 'Fila', backgroundColor: Colors.grey.shade200);
                 }
               } else {
-                if (index < playersPerTeam) {
+                if (index < _playersPerTeam) {
                   teamDisplay = TeamDisplay(label: 'Time A', backgroundColor: Colors.green.shade100);
-                } else if (index < playersPerTeam * 2) {
+                } else if (index < _playersPerTeam * 2) {
                   teamDisplay = TeamDisplay(label: 'Time B', backgroundColor: Colors.blue.shade100);
-                } else if (index < playersPerTeam * 3) {
+                } else if (index < _playersPerTeam * 3) {
                   teamDisplay = TeamDisplay(label: 'Próx', backgroundColor: Colors.yellow.shade100);
                 } else {
                   teamDisplay = TeamDisplay(label: 'Fila', backgroundColor: Colors.grey.shade200);
@@ -301,6 +305,7 @@ class _PlayersManagementScreenState extends State<PlayersManagementScreen> {
                 key: ValueKey(player.id),
                 player: player,
                 onEdit: () => _showEditDialog(player, isSetterList),
+                onDelete: () => _handleDeletePlayer(player, isSetterList),
                 isSetter: isSetterList,
                 teamDisplay: teamDisplay,
               );
@@ -314,9 +319,10 @@ class _PlayersManagementScreenState extends State<PlayersManagementScreen> {
   void _handleReorder(bool isSetterList, int oldIndex, int newIndex) {
     setState(() {
       final list = isSetterList ? _setters : _players;
-      if (oldIndex < newIndex) newIndex--;
-      final player = list.removeAt(oldIndex);
-      list.insert(newIndex, player);
+      if (oldIndex == newIndex) return;
+      final temp = list[oldIndex];
+      list[oldIndex] = list[newIndex];
+      list[newIndex] = temp;
     });
   }
 
@@ -455,7 +461,18 @@ class _PlayersManagementScreenState extends State<PlayersManagementScreen> {
             ),
           );
         } else {
-          _setters.remove(player);
+          final index = _setters.indexOf(player);
+          if (index < setterPerTeam * 2) {
+            int nextTeamStart = setterPerTeam * 2;
+            if (_setters.length > nextTeamStart) {
+              final promoted = _setters.removeAt(nextTeamStart);
+              _setters[index] = promoted;
+            } else {
+              _setters.removeAt(index);
+            }
+          } else {
+            _setters.remove(player);
+          }
         }
       } else {
         if ((!widget.match.separateSetters && _players.length <= (widget.match.getMinimunNumberOfPlayers()))
@@ -468,7 +485,18 @@ class _PlayersManagementScreenState extends State<PlayersManagementScreen> {
             ),
           );
         } else {
-          _players.remove(player);
+          final index = _players.indexOf(player);
+          if (index < _playersPerTeam * 2) {
+            int nextTeamStart = _playersPerTeam * 2;
+            if (_players.length > nextTeamStart) {
+              final promoted = _players.removeAt(nextTeamStart);
+              _players[index] = promoted;
+            } else {
+              _players.removeAt(index);
+            }
+          } else {
+            _players.remove(player);
+          }
         }
       }
     });

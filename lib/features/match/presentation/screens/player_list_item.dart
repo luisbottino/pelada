@@ -6,6 +6,7 @@ import '../../../../core/models/player.dart';
 class PlayerListItem extends StatelessWidget {
   final Player player;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
   final bool isSetter;
   final TeamDisplay teamDisplay;
 
@@ -13,6 +14,7 @@ class PlayerListItem extends StatelessWidget {
     required Key key,
     required this.player,
     required this.onEdit,
+    required this.onDelete,
     required this.isSetter,
     required this.teamDisplay
   }) : super(key: key);
@@ -47,9 +49,37 @@ class PlayerListItem extends StatelessWidget {
                 ),
               ),
             ),
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: onEdit,
+            PopupMenuButton(
+              icon: const Icon(Icons.more_vert),
+              onSelected: (value) {
+                if (value == 'edit') {
+                  onEdit();
+                } else if (value == 'delete') {
+                  onDelete();
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, size: 18),
+                      SizedBox(width: 8),
+                      Text('Editar'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, color: Colors.red, size: 18),
+                      SizedBox(width: 8),
+                      Text('Excluir', style: TextStyle(color: Colors.red)),
+                    ]
+                  ),
+                )
+              ]
             ),
           ],
         ),

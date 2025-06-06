@@ -100,7 +100,35 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: ListTile(
                               title: Text(match.name),
                               subtitle: Text(_getFormatLabel(match.format)),
-                              trailing: const Icon(Icons.arrow_forward, size: 18),
+                              trailing: IconButton(
+                                icon: Icon(Icons.delete, color: Colors.red),
+                                onPressed: () async {
+                                  final confirm = await showDialog(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: const Text('Excluir pelada'),
+                                      content: const Text('Tem certeza que deseja excluir esta pelada?'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(context, false),
+                                          child: Text('Cancelar'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(context, true),
+                                          child: Text('Excluir', style: TextStyle(color: Colors.red)),
+                                        )
+                                      ],
+                                    )
+                                  );
+
+                                  if (confirm == true) {
+                                    await StorageService.deleteMatch(match.id);
+                                    setState(() {
+                                      matches.removeAt(index);
+                                    });
+                                  }
+                                },
+                              ),
                               onTap: () async {
                                 await Navigator.push(
                                     context,
